@@ -3,7 +3,9 @@ import '../database/database_helper.dart';
 import '../models/game.dart';
 
 class AddGameScreen extends StatefulWidget {
-  const AddGameScreen({super.key});
+  const AddGameScreen({super.key, this.gameToEdit});
+
+  final Game? gameToEdit;
 
   @override
   State<AddGameScreen> createState() => _AddGameScreenState();
@@ -19,6 +21,8 @@ class _AddGameScreenState extends State<AddGameScreen> {
   String _status = 'Pending';
   int _rating = 3;
 
+  bool get _isEditMode => widget.gameToEdit != null;
+
   static const _platforms = [
     'PC',
     'PlayStation',
@@ -30,6 +34,20 @@ class _AddGameScreenState extends State<AddGameScreen> {
   static const _statuses = ['Pending', 'Playing', 'Completed'];
 
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final game = widget.gameToEdit;
+    if (game != null) {
+      _titleController.text = game.title;
+      _genreController.text = game.genre ?? '';
+      _imageUrlController.text = game.imageUrl ?? '';
+      _platform = game.platform;
+      _status = game.status;
+      _rating = game.rating.round().clamp(1, 5);
+    }
+  }
 
   @override
   void dispose() {
@@ -44,6 +62,7 @@ class _AddGameScreenState extends State<AddGameScreen> {
     setState(() => _isSaving = true);
 
     final game = Game(
+      id: widget.gameToEdit?.id,
       title: _titleController.text.trim(),
       platform: _platform,
       status: _status,
@@ -54,14 +73,24 @@ class _AddGameScreenState extends State<AddGameScreen> {
       imageUrl: _imageUrlController.text.trim().isEmpty
           ? null
           : _imageUrlController.text.trim(),
+      createdAt: widget.gameToEdit?.createdAt,
     );
 
-    await DatabaseHelper.instance.insertGame(game);
+    if (_isEditMode) {
+      await DatabaseHelper.instance.updateGame(game);
+    } else {
+      await DatabaseHelper.instance.insertGame(game);
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('¡"${game.title}" agregado correctamente!'),
-          backgroundColor: Colors.green,
+          content: Text(
+            _isEditMode
+                ? '"${game.title}" actualizado correctamente'
+                : '"${game.title}" agregado correctamente',
+          ),
+          backgroundColor: _isEditMode ? Colors.blueGrey : Colors.green,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -73,7 +102,7 @@ class _AddGameScreenState extends State<AddGameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agregar Videojuego'),
+        title: Text(_isEditMode ? 'Editar Videojuego' : 'Agregar Videojuego'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: SingleChildScrollView(
@@ -179,8 +208,8 @@ class _AddGameScreenState extends State<AddGameScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.save),
-                label: const Text('Guardar'),
+                    : Icon(_isEditMode ? Icons.edit : Icons.save),
+                label: Text(_isEditMode ? 'Guardar cambios' : 'Guardar'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
